@@ -64,7 +64,7 @@ function initCube3D() {
 }
 
 function setCameraDistance() {
-    const dist = cubeOrder * 1.8 + 3;
+    const dist = cubeOrder * 2.2 + 4;
     cube3dCamera.position.set(dist * 0.7, dist * 0.6, dist * 0.9);
     cube3dCamera.lookAt(0, 0, 0);
 }
@@ -132,6 +132,9 @@ function buildCube(order) {
         }
     }
 
+    // 重置旋转状态
+    rotX = 0.5; rotY = 0.5;
+    cubeGroup.rotation.set(rotX, rotY, 0);
     cube3dScene.add(cubeGroup);
 }
 
