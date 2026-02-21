@@ -211,38 +211,112 @@ const MOVE_MAP = {
 // 常见动作的缩略SVG图标 (只展示最常用的R, U, F系列作为示例)
 // 在实际中可以为所有动作绘制，这里简化箭头系统
 function getMoveSVG(move) {
-  // 基础外框
-  const base = `<svg viewBox="0 0 100 100" class="move-svg">
-      <rect x="10" y="10" width="80" height="80" rx="10" fill="var(--bg-secondary)" stroke="var(--glass-border)" stroke-width="4"/>`;
-  const end = `</svg>`;
+  const base = `<svg viewBox="0 0 100 120" class="move-svg" xmlns="http://www.w3.org/2000/svg">`;
+  const defs = `
+    <defs>
+      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="1.5" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+  `;
 
-  const arrowColor = "var(--accent-light)";
+  // Colors for faces
+  const UColor = "#ffffff";
+  const FColor = "#dcdcdc";
+  const RColor = "#b0b0b0";
 
-  // 简易箭头路径字典 (近似3D指示)
-  const arrows = {
-    "R": `<path d="M70,80 L70,20 M60,30 L70,20 L80,30" stroke="${arrowColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "R'": `<path d="M70,20 L70,80 M60,70 L70,80 L80,70" stroke="${arrowColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "R2": `<path d="M60,80 L60,20 M50,30 L60,20 L70,30 M80,80 L80,20 M70,30 L80,20 L90,30" stroke="${arrowColor}" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "L": `<path d="M30,20 L30,80 M20,70 L30,80 L40,70" stroke="${arrowColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "L'": `<path d="M30,80 L30,20 M20,30 L30,20 L40,30" stroke="${arrowColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "L2": `<path d="M20,20 L20,80 M10,70 L20,80 L30,70 M40,20 L40,80 M30,70 L40,80 L50,70" stroke="${arrowColor}" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "U": `<path d="M80,30 L20,30 M30,20 L20,30 L30,40" stroke="${arrowColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "U'": `<path d="M20,30 L80,30 M70,20 L80,30 L70,40" stroke="${arrowColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "U2": `<path d="M80,20 L20,20 M30,10 L20,20 L30,30 M80,40 L20,40 M30,30 L20,40 L30,50" stroke="${arrowColor}" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "D": `<path d="M20,70 L80,70 M70,60 L80,70 L70,80" stroke="${arrowColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "D'": `<path d="M80,70 L20,70 M30,60 L20,70 L30,80" stroke="${arrowColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "D2": `<path d="M20,60 L80,60 M70,50 L80,60 L70,70 M20,80 L80,80 M70,70 L80,80 L70,90" stroke="${arrowColor}" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "F": `<path d="M50,20 A 30 30 0 0 1 80,50 M80,50 L70,40 M80,50 L90,40" stroke="${arrowColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "F'": `<path d="M50,20 A 30 30 0 0 0 20,50 M20,50 L10,40 M20,50 L30,40" stroke="${arrowColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "F2": `<path d="M50,20 A 30 30 0 0 1 80,50 M80,50 L70,40 M80,50 L90,40 M50,10 A 40 40 0 0 1 90,50 M90,50 L80,40 M90,50 L100,40" stroke="${arrowColor}" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-    "B": `<path d="M50,20 A 30 30 0 0 0 20,50 M20,50 L10,40 M20,50 L30,40" stroke="${arrowColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4"/>`,
-    "B'": `<path d="M50,20 A 30 30 0 0 1 80,50 M80,50 L70,40 M80,50 L90,40" stroke="${arrowColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4"/>`,
-    "B2": `<path d="M50,20 A 30 30 0 0 0 20,50 M20,50 L10,40 M20,50 L30,40 M50,10 A 40 40 0 0 0 10,50 M10,50 L0,40 M10,50 L20,40" stroke="${arrowColor}" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4"/>`,
+  // Points for Isometric projection
+  const pTop = {x: 50, y: 15};
+  const pLeft = {x: 15, y: 35};
+  const pRight = {x: 85, y: 35};
+  const pCenter = {x: 50, y: 55};
+  const pBotLeft = {x: 15, y: 75};
+  const pBotRight = {x: 85, y: 75};
+  const pBot = {x: 50, y: 95};
+
+  // Draw a 3x3 face
+  function drawFace(p1, p2, p3, p4, color) {
+    let faceSvg = `<polygon points="${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}" fill="${color}" stroke="#333" stroke-width="1.5" stroke-linejoin="round"/>`;
+    for(let i=1; i<3; i++) {
+        let f = i / 3.0;
+        let m1x = p1.x + (p2.x - p1.x)*f, m1y = p1.y + (p2.y - p1.y)*f;
+        let m2x = p4.x + (p3.x - p4.x)*f, m2y = p4.y + (p3.y - p4.y)*f;
+        faceSvg += `<line x1="${m1x}" y1="${m1y}" x2="${m2x}" y2="${m2y}" stroke="#666" stroke-width="1"/>`;
+        let n1x = p1.x + (p4.x - p1.x)*f, n1y = p1.y + (p4.y - p1.y)*f;
+        let n2x = p2.x + (p3.x - p2.x)*f, n2y = p2.y + (p3.y - p2.y)*f;
+        faceSvg += `<line x1="${n1x}" y1="${n1y}" x2="${n2x}" y2="${n2y}" stroke="#666" stroke-width="1"/>`;
+    }
+    return faceSvg;
+  }
+  
+  let gridSvg = drawFace(pTop, pRight, pCenter, pLeft, UColor) + 
+                drawFace(pLeft, pCenter, pBot, pBotLeft, FColor) + 
+                drawFace(pCenter, pRight, pBotRight, pBot, RColor);
+
+  // Draw 3D arrow
+  function drawArrow(startX, startY, endX, endY, color="#ff2a2a") {
+    const headLen = 12;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const angle = Math.atan2(dy, dx);
+    const line = `<path d="M ${startX} ${startY} L ${endX} ${endY}" stroke="${color}" stroke-width="6" fill="none" stroke-linecap="round" class="arrow" filter="url(#glow)"/>`;
+    const x1 = endX - headLen * Math.cos(angle - Math.PI/6);
+    const y1 = endY - headLen * Math.sin(angle - Math.PI/6);
+    const x2 = endX - headLen * Math.cos(angle + Math.PI/6);
+    const y2 = endY - headLen * Math.sin(angle + Math.PI/6);
+    const head = `<polygon points="${endX},${endY} ${x1},${y1} ${x2},${y2}" fill="${color}" filter="url(#glow)"/>`;
+    return line + head;
+  }
+
+  // Pre-configured arrows
+  let arrows = '';
+  // Note: U/D is left-right, F is diag-up, R is ver-down
+  const mapStr = {
+     "U": drawArrow(22, 32, 72, 32),
+     "U'": drawArrow(72, 32, 22, 32),
+     "U2": drawArrow(26, 26, 68, 26) + drawArrow(32, 36, 74, 36),
+     "R": drawArrow(74, 80, 74, 42),
+     "R'": drawArrow(74, 42, 74, 80),
+     "R2": drawArrow(66, 84, 66, 46) + drawArrow(80, 76, 80, 38),
+     "L": drawArrow(26, 42, 26, 80),
+     "L'": drawArrow(26, 80, 26, 42),
+     "L2": drawArrow(20, 38, 20, 76) + drawArrow(34, 46, 34, 84),
+     "F": drawArrow(26, 60, 68, 80), 
+     "F'": drawArrow(68, 80, 26, 60),
+     "F2": drawArrow(32, 54, 72, 74) + drawArrow(20, 66, 62, 86),
+     "D": drawArrow(82, 90, 30, 90),
+     "D'": drawArrow(30, 90, 82, 90),
+     "D2": drawArrow(30, 86, 76, 86) + drawArrow(34, 98, 80, 98),
+     "B": drawArrow(80, 20, 26, 20),
+     "B'": drawArrow(26, 20, 80, 20),
+     "B2": drawArrow(22, 16, 76, 16) + drawArrow(28, 24, 82, 24),
+     "M": drawArrow(50, 48, 50, 88), 
+     "M'": drawArrow(50, 88, 50, 48),
+     "M2": drawArrow(44, 44, 44, 84) + drawArrow(56, 52, 56, 92),
+     "E": drawArrow(30, 60, 70, 60),
+     "E'": drawArrow(70, 60, 30, 60),
+     "S": drawArrow(35, 45, 65, 60),
+     "S'": drawArrow(65, 60, 35, 45),
+     "y": drawArrow(10, 55, 90, 55, "#4facf7"), // blue arrow for whole cube rotation
+     "y'": drawArrow(90, 55, 10, 55, "#4facf7"),
+     "x": drawArrow(50, 90, 50, 10, "#4facf7"),
+     "x'": drawArrow(50, 10, 50, 90, "#4facf7"),
+     "z": drawArrow(20, 70, 80, 35, "#4facf7"),
+     "z'": drawArrow(80, 35, 20, 70, "#4facf7"),
   };
+  
+  if(mapStr[move]) arrows += mapStr[move];
+  else {
+      // fallback if unknown move (maybe it's a wide move like Rw?)
+      // we can map Rw to r etc. We will handle generic fallback by omitting arrow and just text
+  }
 
-  const arrow = arrows[move] || `<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff" font-size="24" font-family="monospace">${move}</text>`;
-  return base + arrow + end;
+  const textNode = `<text x="50" y="112" dominant-baseline="middle" text-anchor="middle" fill="var(--text-main)" font-size="22" font-family="'Orbitron', monospace" font-weight="bold">${move}</text>`;
+  
+  return base + defs + gridSvg + arrows + textNode + `</svg>`;
 }
+
 
 // 解析中文算法为标准算法序列
 function parseAlgo(algoStr) {

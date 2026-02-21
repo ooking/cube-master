@@ -4,9 +4,13 @@
 
 let cube3dScene, cube3dCamera, cube3dRenderer, cube3dControls;
 let cubeGroup;
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
 let cubeOrder = 3;
 let cubePieces = [];
 let isAnimating = false;
+let isRotatingLayer = false;
+
 let cube3dInited = false;
 
 const FACE_COLORS = {
@@ -138,33 +142,164 @@ function buildCube(order) {
     cube3dScene.add(cubeGroup);
 }
 
-// Orbit controls (简易手动实现)
+
+
+// Orbit controls + Slice rotation
 let isDragging = false;
+let isSliceDragging = false;
+let dragStartPos = { x: 0, y: 0 };
 let prevMouse = { x: 0, y: 0 };
 let rotX = 0.5, rotY = 0.5;
 
+let hitPiece = null;
+let hitFaceNormal = null;
+
 function setupOrbitControls(canvas) {
     canvas.addEventListener('pointerdown', (e) => {
-        isDragging = true;
-        prevMouse = { x: e.clientX, y: e.clientY };
-    });
-    canvas.addEventListener('pointermove', (e) => {
-        if (!isDragging) return;
-        const dx = e.clientX - prevMouse.x;
-        const dy = e.clientY - prevMouse.y;
-        rotY += dx * 0.008;
-        rotX += dy * 0.008;
-        rotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotX));
-        if (cubeGroup) {
-            cubeGroup.rotation.y = rotY;
-            cubeGroup.rotation.x = rotX;
+        if (isRotatingLayer || isAnimating) return;
+        
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        
+        raycaster.setFromCamera(mouse, cube3dCamera);
+        // Intersect only with actual pieces in the group
+        const intersects = raycaster.intersectObjects(cubePieces, false);
+        
+        if (intersects.length > 0) {
+            isSliceDragging = true;
+            hitPiece = intersects[0].object;
+            hitFaceNormal = intersects[0].face.normal.clone();
+            
+            // Get normal relative to cubeGroup
+            const normalMatrix = new THREE.Matrix3().getNormalMatrix(hitPiece.matrixWorld);
+            hitFaceNormal.applyMatrix3(normalMatrix).normalize();
+            
+            const groupInvMat = new THREE.Matrix4().copy(cubeGroup.matrixWorld).invert();
+            const groupNormalMat = new THREE.Matrix3().getNormalMatrix(groupInvMat);
+            hitFaceNormal.applyMatrix3(groupNormalMat).normalize();
+            
+            // Snap to nearest axis (1,0,0), (0,1,0), etc.
+            hitFaceNormal.x = Math.abs(hitFaceNormal.x) > 0.5 ? Math.sign(hitFaceNormal.x) : 0;
+            hitFaceNormal.y = Math.abs(hitFaceNormal.y) > 0.5 ? Math.sign(hitFaceNormal.y) : 0;
+            hitFaceNormal.z = Math.abs(hitFaceNormal.z) > 0.5 ? Math.sign(hitFaceNormal.z) : 0;
+        } else {
+            isDragging = true;
         }
+        
+        dragStartPos = { x: e.clientX, y: e.clientY };
         prevMouse = { x: e.clientX, y: e.clientY };
     });
-    canvas.addEventListener('pointerup', () => { isDragging = false; });
-    canvas.addEventListener('pointerleave', () => { isDragging = false; });
+    
+    canvas.addEventListener('pointermove', (e) => {
+        if (isSliceDragging && !isRotatingLayer) {
+            const dx = e.clientX - dragStartPos.x;
+            const dy = e.clientY - dragStartPos.y;
+            // Configurable threshold for slice rotation
+            if (Math.abs(dx) > 15 || Math.abs(dy) > 15) {
+                isSliceDragging = false; // Trigger once
+                handleSliceSwipe(dx, dy);
+            }
+        } else if (isDragging && !isRotatingLayer) {
+            const dx = e.clientX - prevMouse.x;
+            const dy = e.clientY - prevMouse.y;
+            rotY += dx * 0.008;
+            rotX += dy * 0.008;
+            rotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotX));
+            if (cubeGroup) {
+                cubeGroup.rotation.y = rotY;
+                cubeGroup.rotation.x = rotX;
+            }
+            prevMouse = { x: e.clientX, y: e.clientY };
+        }
+    });
+
+    canvas.addEventListener('pointerup', () => { isDragging = false; isSliceDragging = false; });
+    canvas.addEventListener('pointerleave', () => { isDragging = false; isSliceDragging = false; });
 }
 
+function handleSliceSwipe(dx, dy) {
+    if (!hitPiece || isRotatingLayer || isAnimating) return;
+    
+    const isHorizontalSwipe = Math.abs(dx) > Math.abs(dy);
+    
+    let axis = '';
+    let dir = 1;
+    let layerIdx = 0;
+    
+    // Pieces swap visually but we track logical coords from position via math
+    // Instead of trusting userData.gx/gy/gz which might not update cleanly after complex rotation,
+    // we use world coordinates brought back to local space to find the nearest layer index.
+    
+    const pos = new THREE.Vector3();
+    hitPiece.getWorldPosition(pos);
+    cubeGroup.worldToLocal(pos);
+    
+    const half = (cubeOrder - 1) / 2;
+    const gap = 0.06;
+    const size = 1;
+    const unit = size + gap * 0.5;
+    
+    const gx = Math.round(pos.x / unit + half);
+    const gy = Math.round(pos.y / unit + half);
+    const gz = Math.round(pos.z / unit + half);
+    
+    let nx = Math.abs(hitFaceNormal.x);
+    let ny = Math.abs(hitFaceNormal.y);
+    let nz = Math.abs(hitFaceNormal.z);
+
+    // Heuristics mapping 2D pixel swiping to 3D cube axes
+    // In threejs perspective camera, looking down towards origin => X is right, Y is up, Z is toward us.
+    // So swiping right (dx>0) usually maps to positive X movement, or rotation around Y.
+    
+    if (ny > 0.5) { // Top or Bottom face
+        if (isHorizontalSwipe) {
+            axis = 'z';
+            layerIdx = gz;
+            dir = (dx > 0) ? -1 : 1;
+            if (hitFaceNormal.y < 0) dir *= -1;
+        } else {
+            axis = 'x';
+            layerIdx = gx;
+            dir = (dy > 0) ? -1 : 1;
+            if (hitFaceNormal.y < 0) dir *= -1;
+        }
+    } else if (nz > 0.5) { // Front or Back face
+        if (isHorizontalSwipe) {
+            axis = 'y';
+            layerIdx = gy;
+            dir = (dx > 0) ? 1 : -1;
+            if (hitFaceNormal.z < 0) dir *= -1;
+        } else {
+            axis = 'x';
+            layerIdx = gx;
+            dir = (dy > 0) ? 1 : -1;
+            if (hitFaceNormal.z < 0) dir *= -1;
+        }
+    } else if (nx > 0.5) { // Left or Right face
+        if (isHorizontalSwipe) {
+            axis = 'y';
+            layerIdx = gy;
+            dir = (dx > 0) ? -1 : 1;
+            if (hitFaceNormal.x < 0) dir *= -1;
+        } else {
+            axis = 'z';
+            layerIdx = gz;
+            dir = (dy > 0) ? -1 : 1;
+            if (hitFaceNormal.x < 0) dir *= -1;
+        }
+    }
+    
+    // Bounds check
+    layerIdx = Math.max(0, Math.min(cubeOrder - 1, layerIdx));
+    
+    if (axis) {
+        isRotatingLayer = true;
+        animateLayerRotation(axis, layerIdx, dir * Math.PI / 2, 250).then(() => {
+            isRotatingLayer = false;
+        });
+    }
+}
 // 打乱动画
 async function scrambleCube3D() {
     if (isAnimating) return;

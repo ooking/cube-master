@@ -318,26 +318,14 @@ body {
 }
 
 /* 公式中的动作序列容器 */
-.formula-visuals-container {
-    display: flex;
-    gap: 4px;
-    overflow-x: auto;
-    padding: 8px 0;
-    margin-bottom: 4px;
-    scrollbar-width: none;
-    /* Firefox */
-}
+.formula-visuals-container { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-start; margin: 12px 0; }
 
 .formula-visuals-container::-webkit-scrollbar {
     display: none;
     /* Chrome/Safari */
 }
 
-.move-svg {
-    width: 36px;
-    height: 36px;
-    flex-shrink: 0;
-}
+.move-svg { width: 44px; height: 53px; flex-shrink: 0; overflow: visible; }
 
 .twisty-container {
     width: 100%;
