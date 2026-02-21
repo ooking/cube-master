@@ -208,116 +208,195 @@ const MOVE_MAP = {
   '后顺': 'B', '后逆': "B'", '后双': 'B2'
 };
 
-// 常见动作的缩略SVG图标 (只展示最常用的R, U, F系列作为示例)
-// 在实际中可以为所有动作绘制，这里简化箭头系统
+// 公式可视化 - 等轴测3D魔方 + 红色箭头指示
+// 参考图：每个动作用一个带箭头的3D魔方图标表示，下方显示动作字母
 function getMoveSVG(move) {
-  const base = `<svg viewBox="0 0 100 120" class="move-svg" xmlns="http://www.w3.org/2000/svg">`;
-  const defs = `
-    <defs>
-      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation="1.5" result="blur" />
-        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-      </filter>
-    </defs>
-  `;
+  // 使用唯一 id 避免 SVG marker 冲突
+  const uid = 'a' + Math.random().toString(36).substr(2, 6);
 
-  // Colors for faces
-  const UColor = "#ffffff";
-  const FColor = "#dcdcdc";
-  const RColor = "#b0b0b0";
+  let svg = `<svg viewBox="0 0 120 140" class="move-svg" xmlns="http://www.w3.org/2000/svg">`;
 
-  // Points for Isometric projection
-  const pTop = { x: 50, y: 15 };
-  const pLeft = { x: 15, y: 35 };
-  const pRight = { x: 85, y: 35 };
-  const pCenter = { x: 50, y: 55 };
-  const pBotLeft = { x: 15, y: 75 };
-  const pBotRight = { x: 85, y: 75 };
-  const pBot = { x: 50, y: 95 };
+  // 定义箭头标记 (marker)
+  svg += `<defs>
+    <marker id="ah-${uid}" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,4 L0,8 L2,4 Z" fill="#e81515"/>
+    </marker>
+    <marker id="ahb-${uid}" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,4 L0,8 L2,4 Z" fill="#2196f3"/>
+    </marker>
+  </defs>`;
 
-  // Draw a 3x3 face
-  function drawFace(p1, p2, p3, p4, color) {
-    let faceSvg = `<polygon points="${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}" fill="${color}" stroke="#333" stroke-width="1.5" stroke-linejoin="round"/>`;
+  // ===== 等轴测3D魔方坐标 =====
+  // 6个关键点构成3面可见的立方体
+  const T = [60, 10];   // 顶点
+  const TL = [12, 34];   // 左上
+  const TR = [108, 34];  // 右上
+  const C = [60, 58];   // 中心
+  const BL = [12, 82];   // 左下
+  const BR = [108, 82];  // 右下
+  const B = [60, 106];  // 底点
+
+  // 绘制一个平行四边形面 + 3x3网格线
+  function face(p1, p2, p3, p4, fill) {
+    let s = `<polygon points="${p1} ${p2} ${p3} ${p4}" fill="${fill}" stroke="#444" stroke-width="1.8" stroke-linejoin="round"/>`;
     for (let i = 1; i < 3; i++) {
-      let f = i / 3.0;
-      let m1x = p1.x + (p2.x - p1.x) * f, m1y = p1.y + (p2.y - p1.y) * f;
-      let m2x = p4.x + (p3.x - p4.x) * f, m2y = p4.y + (p3.y - p4.y) * f;
-      faceSvg += `<line x1="${m1x}" y1="${m1y}" x2="${m2x}" y2="${m2y}" stroke="#666" stroke-width="1"/>`;
-      let n1x = p1.x + (p4.x - p1.x) * f, n1y = p1.y + (p4.y - p1.y) * f;
-      let n2x = p2.x + (p3.x - p2.x) * f, n2y = p2.y + (p3.y - p2.y) * f;
-      faceSvg += `<line x1="${n1x}" y1="${n1y}" x2="${n2x}" y2="${n2y}" stroke="#666" stroke-width="1"/>`;
+      const t = i / 3;
+      // p1->p2 方向的线 (连接 p4->p3 方向的对应点)
+      const a = lerp(p1, p2, t), b = lerp(p4, p3, t);
+      s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#555" stroke-width="0.8"/>`;
+      // p1->p4 方向的线
+      const c = lerp(p1, p4, t), d = lerp(p2, p3, t);
+      s += `<line x1="${c[0]}" y1="${c[1]}" x2="${d[0]}" y2="${d[1]}" stroke="#555" stroke-width="0.8"/>`;
     }
-    return faceSvg;
+    return s;
   }
 
-  let gridSvg = drawFace(pTop, pRight, pCenter, pLeft, UColor) +
-    drawFace(pLeft, pCenter, pBot, pBotLeft, FColor) +
-    drawFace(pCenter, pRight, pBotRight, pBot, RColor);
-
-  // Draw 3D arrow — line must be clearly visible
-  function drawArrow(startX, startY, endX, endY, color = "#ff2a2a") {
-    const headLen = 8;
-    const dx = endX - startX;
-    const dy = endY - startY;
-    const angle = Math.atan2(dy, dx);
-    // Shorten line so it stops before the arrowhead
-    const lineEndX = endX - headLen * 0.6 * Math.cos(angle);
-    const lineEndY = endY - headLen * 0.6 * Math.sin(angle);
-    const line = `<path d="M ${startX} ${startY} L ${lineEndX} ${lineEndY}" stroke="${color}" stroke-width="5" fill="none" stroke-linecap="round" class="arrow"/>`;
-    const x1 = endX - headLen * Math.cos(angle - Math.PI / 5);
-    const y1 = endY - headLen * Math.sin(angle - Math.PI / 5);
-    const x2 = endX - headLen * Math.cos(angle + Math.PI / 5);
-    const y2 = endY - headLen * Math.sin(angle + Math.PI / 5);
-    const head = `<polygon points="${endX},${endY} ${x1},${y1} ${x2},${y2}" fill="${color}"/>`;
-    return line + head;
+  function lerp(a, b, t) {
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
   }
 
-  // Pre-configured arrows
-  let arrows = '';
-  // Note: U/D is left-right, F is diag-up, R is ver-down
-  const mapStr = {
-    "U": drawArrow(18, 32, 78, 32),
-    "U'": drawArrow(78, 32, 18, 32),
-    "U2": drawArrow(20, 24, 74, 24) + drawArrow(26, 40, 80, 40),
-    "R": drawArrow(76, 82, 76, 38),
-    "R'": drawArrow(76, 38, 76, 82),
-    "R2": drawArrow(66, 86, 66, 42) + drawArrow(84, 78, 84, 34),
-    "L": drawArrow(24, 38, 24, 82),
-    "L'": drawArrow(24, 82, 24, 38),
-    "L2": drawArrow(16, 34, 16, 78) + drawArrow(34, 42, 34, 86),
-    "F": drawArrow(20, 56, 72, 84),
-    "F'": drawArrow(72, 84, 20, 56),
-    "F2": drawArrow(26, 50, 66, 72) + drawArrow(14, 62, 54, 84),
-    "D": drawArrow(86, 92, 24, 92),
-    "D'": drawArrow(24, 92, 86, 92),
-    "D2": drawArrow(24, 86, 82, 86) + drawArrow(28, 98, 86, 98),
-    "B": drawArrow(82, 18, 20, 18),
-    "B'": drawArrow(20, 18, 82, 18),
-    "B2": drawArrow(18, 12, 80, 12) + drawArrow(22, 24, 84, 24),
-    "M": drawArrow(50, 42, 50, 90),
-    "M'": drawArrow(50, 90, 50, 42),
-    "M2": drawArrow(42, 40, 42, 86) + drawArrow(58, 46, 58, 92),
-    "E": drawArrow(24, 60, 76, 60),
-    "E'": drawArrow(76, 60, 24, 60),
-    "S": drawArrow(30, 40, 70, 64),
-    "S'": drawArrow(70, 64, 30, 40),
-    "y": drawArrow(6, 55, 94, 55, "#4facf7"),
-    "y'": drawArrow(94, 55, 6, 55, "#4facf7"),
-    "x": drawArrow(50, 94, 50, 6, "#4facf7"),
-    "x'": drawArrow(50, 6, 50, 94, "#4facf7"),
-    "z": drawArrow(14, 74, 86, 30, "#4facf7"),
-    "z'": drawArrow(86, 30, 14, 74, "#4facf7"),
+  // U面 (顶面 - 白色): T, TR, C, TL
+  svg += face(T, TR, C, TL, '#f5f5f5');
+  // F面 (前左面 - 浅灰): TL, C, B, BL
+  svg += face(TL, C, B, BL, '#d9d9d9');
+  // R面 (前右面 - 深灰): C, TR, BR, B
+  svg += face(C, TR, BR, B, '#b3b3b3');
+
+  // ===== 箭头绘制 =====
+  const red = `stroke="#e81515" stroke-width="4" fill="none" stroke-linecap="round" marker-end="url(#ah-${uid})"`;
+  const blue = `stroke="#2196f3" stroke-width="4" fill="none" stroke-linecap="round" marker-end="url(#ahb-${uid})"`;
+
+  // 计算箭头：在对应面上沿着某行/某列画一条带箭头的线
+  // U面 (顶面) 行列方向:
+  //   水平(左→右): 沿 TL->TR 方向, 行高由 T->C 方向偏移
+  //   纵向(上→下): 沿 T->C 方向 (即 TL->BL 投影后 → T->B 中间)
+  // F面 (前左面):
+  //   水平方向: 沿 TL->C 方向
+  //   竖直方向: 沿 TL->BL 方向
+  // R面 (前右面):
+  //   水平方向: 沿 C->TR 方向
+  //   竖直方向: 沿 TR->BR 方向
+
+  // U面中线（行1/2处）
+  const uMidL = lerp(TL, lerp(T, BL, 0.5), 0); // = TL
+  const uMid1 = lerp(T, C, 0.5);  // U面中心线的锚
+  const uRowL = lerp(TL, BL, 0.17); // U面行-左端 (偏下一点让箭头在面内)
+  const uRowR = lerp(TR, BR, 0.17);
+  // F面中线
+  const fColT = lerp(TL, C, 0.17);
+  const fColB = lerp(BL, B, 0.17);
+  // R面中线
+  const rColT = lerp(C, TR, 0.83);
+  const rColB = lerp(B, BR, 0.83);
+
+  // 面中点计算 helper
+  function faceMid(p1, p2, p3, p4, u, v) {
+    const top = lerp(p1, p2, u);
+    const bot = lerp(p4, p3, u);
+    return lerp(top, bot, v);
+  }
+
+  // U面: 箭头从左到右 = U turn (顺时针从上往下看)
+  // 我们画在U面中间的行上
+  const uArrowL = faceMid(T, TR, C, TL, 0.1, 0.5);
+  const uArrowR = faceMid(T, TR, C, TL, 0.9, 0.5);
+
+  // R面: 箭头从下到上 = R turn
+  const rArrowB = faceMid(C, TR, BR, B, 0.5, 0.9);
+  const rArrowT = faceMid(C, TR, BR, B, 0.5, 0.1);
+
+  // L面: 箭头从上到下 = L turn (在F面左侧列)
+  const lArrowT = faceMid(TL, C, B, BL, 0.1, 0.1);
+  const lArrowB = faceMid(TL, C, B, BL, 0.1, 0.9);
+
+  // F面: 对角线方向 = F turn
+  const fArrowTL = faceMid(TL, C, B, BL, 0.85, 0.15);
+  const fArrowBR = faceMid(TL, C, B, BL, 0.15, 0.85);
+
+  // D面: U面底部边缘
+  const dArrowL = [14, 96];
+  const dArrowR = [106, 96];
+
+  // B面: 顶面上边缘
+  const bArrowL = [18, 12];
+  const bArrowR = [102, 12];
+
+  function arrow(from, to, style) {
+    return `<line x1="${from[0]}" y1="${from[1]}" x2="${to[0]}" y2="${to[1]}" ${style}/>`;
+  }
+
+  function doubleArrow(from1, to1, from2, to2, style) {
+    return arrow(from1, to1, style) + arrow(from2, to2, style);
+  }
+
+  let arrowsSvg = '';
+  const m = {
+    // U面旋转: 箭头在顶面从左到右
+    "U": arrow(uArrowL, uArrowR, red),
+    "U'": arrow(uArrowR, uArrowL, red),
+    "U2": doubleArrow(
+      faceMid(T, TR, C, TL, 0.1, 0.35), faceMid(T, TR, C, TL, 0.9, 0.35),
+      faceMid(T, TR, C, TL, 0.1, 0.65), faceMid(T, TR, C, TL, 0.9, 0.65), red),
+
+    // R面旋转: 箭头在右面从下到上
+    "R": arrow(rArrowB, rArrowT, red),
+    "R'": arrow(rArrowT, rArrowB, red),
+    "R2": doubleArrow(
+      faceMid(C, TR, BR, B, 0.35, 0.9), faceMid(C, TR, BR, B, 0.35, 0.1),
+      faceMid(C, TR, BR, B, 0.65, 0.9), faceMid(C, TR, BR, B, 0.65, 0.1), red),
+
+    // L面旋转: 箭头在前左面从上到下 (左侧列)
+    "L": arrow(lArrowT, lArrowB, red),
+    "L'": arrow(lArrowB, lArrowT, red),
+    "L2": doubleArrow(
+      faceMid(TL, C, B, BL, 0.15, 0.1), faceMid(TL, C, B, BL, 0.15, 0.9),
+      faceMid(TL, C, B, BL, 0.35, 0.1), faceMid(TL, C, B, BL, 0.35, 0.9), red),
+
+    // F面旋转: 箭头在前左面对角
+    "F": arrow(fArrowBR, fArrowTL, red),
+    "F'": arrow(fArrowTL, fArrowBR, red),
+    "F2": doubleArrow(
+      faceMid(TL, C, B, BL, 0.75, 0.2), faceMid(TL, C, B, BL, 0.25, 0.8),
+      faceMid(TL, C, B, BL, 0.6, 0.25), faceMid(TL, C, B, BL, 0.1, 0.85), red),
+
+    // D面旋转
+    "D": arrow(dArrowR, dArrowL, red),
+    "D'": arrow(dArrowL, dArrowR, red),
+    "D2": doubleArrow([14, 92], [106, 92], [14, 100], [106, 100], red),
+
+    // B面旋转
+    "B": arrow(bArrowR, bArrowL, red),
+    "B'": arrow(bArrowL, bArrowR, red),
+    "B2": doubleArrow([18, 8], [102, 8], [18, 16], [102, 16], red),
+
+    // M层 (中间层 L-R之间, 竖直)
+    "M": arrow(faceMid(TL, C, B, BL, 0.5, 0.1), faceMid(TL, C, B, BL, 0.5, 0.9), red),
+    "M'": arrow(faceMid(TL, C, B, BL, 0.5, 0.9), faceMid(TL, C, B, BL, 0.5, 0.1), red),
+
+    // E层 (中间层 U-D之间, 水平)
+    "E": arrow(faceMid(C, TR, BR, B, 0.5, 0.5), faceMid(TL, C, B, BL, 0.5, 0.5), red),
+    "E'": arrow(faceMid(TL, C, B, BL, 0.5, 0.5), faceMid(C, TR, BR, B, 0.5, 0.5), red),
+
+    // S层
+    "S": arrow(faceMid(T, TR, C, TL, 0.5, 0.1), [60, 100], red),
+    "S'": arrow([60, 100], faceMid(T, TR, C, TL, 0.5, 0.1), red),
+
+    // 整体旋转 (蓝色箭头)
+    "y": arrow(uArrowL, uArrowR, blue),
+    "y'": arrow(uArrowR, uArrowL, blue),
+    "x": arrow(rArrowB, rArrowT, blue),
+    "x'": arrow(rArrowT, rArrowB, blue),
+    "z": arrow(fArrowBR, fArrowTL, blue),
+    "z'": arrow(fArrowTL, fArrowBR, blue),
   };
 
-  if (mapStr[move]) arrows += mapStr[move];
-  else {
-    // fallback if unknown move (maybe it's a wide move like Rw?)
-    // we can map Rw to r etc. We will handle generic fallback by omitting arrow and just text
-  }
+  if (m[move]) arrowsSvg = m[move];
 
-  const textNode = `<text x="50" y="112" dominant-baseline="middle" text-anchor="middle" fill="var(--text-main)" font-size="22" font-family="'Orbitron', monospace" font-weight="bold">${move}</text>`;
-
-  return base + defs + gridSvg + arrows + textNode + `</svg>`;
+  // 底部文字标签
+  svg += arrowsSvg;
+  svg += `<text x="60" y="130" dominant-baseline="middle" text-anchor="middle" fill="var(--text-main, #fff)" font-size="18" font-family="'Orbitron', monospace" font-weight="bold">${move}</text>`;
+  svg += `</svg>`;
+  return svg;
 }
 
 

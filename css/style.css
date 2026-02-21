@@ -332,8 +332,8 @@ body {
 }
 
 .move-svg {
-    width: 64px;
-    height: 77px;
+    width: 90px;
+    height: 105px;
     flex-shrink: 0;
     overflow: visible;
 }
