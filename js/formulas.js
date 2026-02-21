@@ -227,45 +227,48 @@ function getMoveSVG(move) {
   const RColor = "#b0b0b0";
 
   // Points for Isometric projection
-  const pTop = {x: 50, y: 15};
-  const pLeft = {x: 15, y: 35};
-  const pRight = {x: 85, y: 35};
-  const pCenter = {x: 50, y: 55};
-  const pBotLeft = {x: 15, y: 75};
-  const pBotRight = {x: 85, y: 75};
-  const pBot = {x: 50, y: 95};
+  const pTop = { x: 50, y: 15 };
+  const pLeft = { x: 15, y: 35 };
+  const pRight = { x: 85, y: 35 };
+  const pCenter = { x: 50, y: 55 };
+  const pBotLeft = { x: 15, y: 75 };
+  const pBotRight = { x: 85, y: 75 };
+  const pBot = { x: 50, y: 95 };
 
   // Draw a 3x3 face
   function drawFace(p1, p2, p3, p4, color) {
     let faceSvg = `<polygon points="${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}" fill="${color}" stroke="#333" stroke-width="1.5" stroke-linejoin="round"/>`;
-    for(let i=1; i<3; i++) {
-        let f = i / 3.0;
-        let m1x = p1.x + (p2.x - p1.x)*f, m1y = p1.y + (p2.y - p1.y)*f;
-        let m2x = p4.x + (p3.x - p4.x)*f, m2y = p4.y + (p3.y - p4.y)*f;
-        faceSvg += `<line x1="${m1x}" y1="${m1y}" x2="${m2x}" y2="${m2y}" stroke="#666" stroke-width="1"/>`;
-        let n1x = p1.x + (p4.x - p1.x)*f, n1y = p1.y + (p4.y - p1.y)*f;
-        let n2x = p2.x + (p3.x - p2.x)*f, n2y = p2.y + (p3.y - p2.y)*f;
-        faceSvg += `<line x1="${n1x}" y1="${n1y}" x2="${n2x}" y2="${n2y}" stroke="#666" stroke-width="1"/>`;
+    for (let i = 1; i < 3; i++) {
+      let f = i / 3.0;
+      let m1x = p1.x + (p2.x - p1.x) * f, m1y = p1.y + (p2.y - p1.y) * f;
+      let m2x = p4.x + (p3.x - p4.x) * f, m2y = p4.y + (p3.y - p4.y) * f;
+      faceSvg += `<line x1="${m1x}" y1="${m1y}" x2="${m2x}" y2="${m2y}" stroke="#666" stroke-width="1"/>`;
+      let n1x = p1.x + (p4.x - p1.x) * f, n1y = p1.y + (p4.y - p1.y) * f;
+      let n2x = p2.x + (p3.x - p2.x) * f, n2y = p2.y + (p3.y - p2.y) * f;
+      faceSvg += `<line x1="${n1x}" y1="${n1y}" x2="${n2x}" y2="${n2y}" stroke="#666" stroke-width="1"/>`;
     }
     return faceSvg;
   }
-  
-  let gridSvg = drawFace(pTop, pRight, pCenter, pLeft, UColor) + 
-                drawFace(pLeft, pCenter, pBot, pBotLeft, FColor) + 
-                drawFace(pCenter, pRight, pBotRight, pBot, RColor);
 
-  // Draw 3D arrow
-  function drawArrow(startX, startY, endX, endY, color="#ff2a2a") {
-    const headLen = 12;
+  let gridSvg = drawFace(pTop, pRight, pCenter, pLeft, UColor) +
+    drawFace(pLeft, pCenter, pBot, pBotLeft, FColor) +
+    drawFace(pCenter, pRight, pBotRight, pBot, RColor);
+
+  // Draw 3D arrow — line must be clearly visible
+  function drawArrow(startX, startY, endX, endY, color = "#ff2a2a") {
+    const headLen = 8;
     const dx = endX - startX;
     const dy = endY - startY;
     const angle = Math.atan2(dy, dx);
-    const line = `<path d="M ${startX} ${startY} L ${endX} ${endY}" stroke="${color}" stroke-width="6" fill="none" stroke-linecap="round" class="arrow" filter="url(#glow)"/>`;
-    const x1 = endX - headLen * Math.cos(angle - Math.PI/6);
-    const y1 = endY - headLen * Math.sin(angle - Math.PI/6);
-    const x2 = endX - headLen * Math.cos(angle + Math.PI/6);
-    const y2 = endY - headLen * Math.sin(angle + Math.PI/6);
-    const head = `<polygon points="${endX},${endY} ${x1},${y1} ${x2},${y2}" fill="${color}" filter="url(#glow)"/>`;
+    // Shorten line so it stops before the arrowhead
+    const lineEndX = endX - headLen * 0.6 * Math.cos(angle);
+    const lineEndY = endY - headLen * 0.6 * Math.sin(angle);
+    const line = `<path d="M ${startX} ${startY} L ${lineEndX} ${lineEndY}" stroke="${color}" stroke-width="5" fill="none" stroke-linecap="round" class="arrow"/>`;
+    const x1 = endX - headLen * Math.cos(angle - Math.PI / 5);
+    const y1 = endY - headLen * Math.sin(angle - Math.PI / 5);
+    const x2 = endX - headLen * Math.cos(angle + Math.PI / 5);
+    const y2 = endY - headLen * Math.sin(angle + Math.PI / 5);
+    const head = `<polygon points="${endX},${endY} ${x1},${y1} ${x2},${y2}" fill="${color}"/>`;
     return line + head;
   }
 
@@ -273,47 +276,47 @@ function getMoveSVG(move) {
   let arrows = '';
   // Note: U/D is left-right, F is diag-up, R is ver-down
   const mapStr = {
-     "U": drawArrow(22, 32, 72, 32),
-     "U'": drawArrow(72, 32, 22, 32),
-     "U2": drawArrow(26, 26, 68, 26) + drawArrow(32, 36, 74, 36),
-     "R": drawArrow(74, 80, 74, 42),
-     "R'": drawArrow(74, 42, 74, 80),
-     "R2": drawArrow(66, 84, 66, 46) + drawArrow(80, 76, 80, 38),
-     "L": drawArrow(26, 42, 26, 80),
-     "L'": drawArrow(26, 80, 26, 42),
-     "L2": drawArrow(20, 38, 20, 76) + drawArrow(34, 46, 34, 84),
-     "F": drawArrow(26, 60, 68, 80), 
-     "F'": drawArrow(68, 80, 26, 60),
-     "F2": drawArrow(32, 54, 72, 74) + drawArrow(20, 66, 62, 86),
-     "D": drawArrow(82, 90, 30, 90),
-     "D'": drawArrow(30, 90, 82, 90),
-     "D2": drawArrow(30, 86, 76, 86) + drawArrow(34, 98, 80, 98),
-     "B": drawArrow(80, 20, 26, 20),
-     "B'": drawArrow(26, 20, 80, 20),
-     "B2": drawArrow(22, 16, 76, 16) + drawArrow(28, 24, 82, 24),
-     "M": drawArrow(50, 48, 50, 88), 
-     "M'": drawArrow(50, 88, 50, 48),
-     "M2": drawArrow(44, 44, 44, 84) + drawArrow(56, 52, 56, 92),
-     "E": drawArrow(30, 60, 70, 60),
-     "E'": drawArrow(70, 60, 30, 60),
-     "S": drawArrow(35, 45, 65, 60),
-     "S'": drawArrow(65, 60, 35, 45),
-     "y": drawArrow(10, 55, 90, 55, "#4facf7"), // blue arrow for whole cube rotation
-     "y'": drawArrow(90, 55, 10, 55, "#4facf7"),
-     "x": drawArrow(50, 90, 50, 10, "#4facf7"),
-     "x'": drawArrow(50, 10, 50, 90, "#4facf7"),
-     "z": drawArrow(20, 70, 80, 35, "#4facf7"),
-     "z'": drawArrow(80, 35, 20, 70, "#4facf7"),
+    "U": drawArrow(18, 32, 78, 32),
+    "U'": drawArrow(78, 32, 18, 32),
+    "U2": drawArrow(20, 24, 74, 24) + drawArrow(26, 40, 80, 40),
+    "R": drawArrow(76, 82, 76, 38),
+    "R'": drawArrow(76, 38, 76, 82),
+    "R2": drawArrow(66, 86, 66, 42) + drawArrow(84, 78, 84, 34),
+    "L": drawArrow(24, 38, 24, 82),
+    "L'": drawArrow(24, 82, 24, 38),
+    "L2": drawArrow(16, 34, 16, 78) + drawArrow(34, 42, 34, 86),
+    "F": drawArrow(20, 56, 72, 84),
+    "F'": drawArrow(72, 84, 20, 56),
+    "F2": drawArrow(26, 50, 66, 72) + drawArrow(14, 62, 54, 84),
+    "D": drawArrow(86, 92, 24, 92),
+    "D'": drawArrow(24, 92, 86, 92),
+    "D2": drawArrow(24, 86, 82, 86) + drawArrow(28, 98, 86, 98),
+    "B": drawArrow(82, 18, 20, 18),
+    "B'": drawArrow(20, 18, 82, 18),
+    "B2": drawArrow(18, 12, 80, 12) + drawArrow(22, 24, 84, 24),
+    "M": drawArrow(50, 42, 50, 90),
+    "M'": drawArrow(50, 90, 50, 42),
+    "M2": drawArrow(42, 40, 42, 86) + drawArrow(58, 46, 58, 92),
+    "E": drawArrow(24, 60, 76, 60),
+    "E'": drawArrow(76, 60, 24, 60),
+    "S": drawArrow(30, 40, 70, 64),
+    "S'": drawArrow(70, 64, 30, 40),
+    "y": drawArrow(6, 55, 94, 55, "#4facf7"),
+    "y'": drawArrow(94, 55, 6, 55, "#4facf7"),
+    "x": drawArrow(50, 94, 50, 6, "#4facf7"),
+    "x'": drawArrow(50, 6, 50, 94, "#4facf7"),
+    "z": drawArrow(14, 74, 86, 30, "#4facf7"),
+    "z'": drawArrow(86, 30, 14, 74, "#4facf7"),
   };
-  
-  if(mapStr[move]) arrows += mapStr[move];
+
+  if (mapStr[move]) arrows += mapStr[move];
   else {
-      // fallback if unknown move (maybe it's a wide move like Rw?)
-      // we can map Rw to r etc. We will handle generic fallback by omitting arrow and just text
+    // fallback if unknown move (maybe it's a wide move like Rw?)
+    // we can map Rw to r etc. We will handle generic fallback by omitting arrow and just text
   }
 
   const textNode = `<text x="50" y="112" dominant-baseline="middle" text-anchor="middle" fill="var(--text-main)" font-size="22" font-family="'Orbitron', monospace" font-weight="bold">${move}</text>`;
-  
+
   return base + defs + gridSvg + arrows + textNode + `</svg>`;
 }
 
